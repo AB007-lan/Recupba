@@ -1,0 +1,40 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node.js
+node_modules/
+dist/
+coverage/
+
+# Environnement et secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE et système
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Journaux et données locales
+*.log
+data/
+backups/
+
+# Sauvegardes manuelles de fichiers
+*.bak
+*.backup-*
+
+# Fichiers générés par les tests
+tests/fixtures/inventory-auto/
