@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from psycopg.types.json import Jsonb
 
-from main import database_connection
+from db import database_connection, log_event
 
 router = APIRouter(prefix="/inventory", tags=["Inventaire"])
 
@@ -32,6 +32,8 @@ def record_failed_run(run_id: UUID, source_id: UUID, message: str) -> None:
                     """,
                     (run_id, source_id, message[:1000]),
                 )
+                log_event(cursor, "inventory.failed", "inventory_run", run_id,
+                          {"source_id": str(source_id), "error": message[:300]})
     except Exception:
         logger.exception("Impossible d'enregistrer l'échec de l'inventaire %s", run_id)
 
@@ -179,6 +181,11 @@ def run_inventory(request: InventoryRequest):
                         run_id,
                     ),
                 )
+                log_event(cursor, "inventory.completed", "inventory_run", run_id, {
+                    "source_id": str(request.source_id),
+                    "files_scanned": len(files_found),
+                    "errors_count": errors,
+                })
 
         return {
             "run_id": str(run_id),
@@ -215,7 +222,7 @@ def compare_inventory(source_id: UUID):
                     SELECT id, status, files_scanned, errors_count, finished_at
                     FROM inventory_runs
                     WHERE source_id = %s
-                      AND status = 'completed'
+                      AND status IN ('completed', 'completed_with_errors')
                     ORDER BY finished_at DESC NULLS LAST, started_at DESC
                     LIMIT 2
                     """,
@@ -353,3 +360,62 @@ def inventory_history(source_id: UUID, limit: int = 20):
             status_code=500,
             detail="Impossible de consulter l'historique des inventaires.",
         )
+
+
+@router.get("/runs/{run_id}")
+def inventory_run_detail(run_id: UUID):
+    try:
+        with database_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT r.id, r.source_id, s.name, r.status, r.files_scanned,
+                           r.errors_count, r.started_at, r.finished_at,
+                           r.error_message
+                    FROM inventory_runs r JOIN sources s ON s.id = r.source_id
+                    WHERE r.id = %s
+                    """,
+                    (run_id,),
+                )
+                run = cursor.fetchone()
+                if run is None:
+                    raise HTTPException(status_code=404, detail="Exécution introuvable.")
+                cursor.execute(
+                    """
+                    SELECT relative_path, size_bytes, modified_at, sha256
+                    FROM inventory_files WHERE run_id = %s
+                    ORDER BY relative_path
+                    """,
+                    (run_id,),
+                )
+                files = cursor.fetchall()
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Échec de la lecture de l'exécution %s", run_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Impossible de consulter l'exécution.",
+        )
+
+    return {
+        "run_id": str(run[0]),
+        "source_id": str(run[1]),
+        "source_name": run[2],
+        "status": run[3],
+        "files_scanned": run[4],
+        "errors_count": run[5],
+        "started_at": run[6].isoformat() if run[6] else None,
+        "finished_at": run[7].isoformat() if run[7] else None,
+        "error_message": run[8],
+        "total_size_bytes": sum(f[1] for f in files),
+        "files": [
+            {
+                "path": f[0],
+                "size_bytes": f[1],
+                "modified_at": f[2].isoformat(),
+                "sha256": f[3].strip(),
+            }
+            for f in files
+        ],
+    }

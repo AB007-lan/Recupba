@@ -19,8 +19,12 @@ def test_sha256_file(tmp_path):
 def test_routes_published(client):
     paths = client.get("/openapi.json").json()["paths"]
     for path in (
-        "/",
+        "/api",
         "/health",
+        "/stats",
+        "/audit",
+        "/sources/{source_id}",
+        "/inventory/runs/{run_id}",
         "/sources",
         "/inventory/run",
         "/inventory/compare/{source_id}",
@@ -107,3 +111,55 @@ def test_full_inventory_cycle(client, auto_source_id):
     started = datetime.fromisoformat(run["started_at"])
     finished = datetime.fromisoformat(run["finished_at"])
     assert finished > started  # clock_timestamp() : fin réelle, pas début de transaction
+
+
+# --- Sources, audit, statistiques --------------------------------------------
+
+def test_create_source_rejects_missing_path(client, database_available):
+    response = client.post("/sources", json={
+        "name": "invalide", "source_type": "filesystem",
+        "configuration": {"path": "Z:/n-existe/pas"},
+    })
+    assert response.status_code == 400
+
+
+def test_get_unknown_source(client, database_available):
+    assert client.get(f"/sources/{uuid4()}").status_code == 404
+
+
+def test_patch_source_and_audit(client, auto_source_id):
+    response = client.patch(f"/sources/{auto_source_id}", json={"enabled": True})
+    assert response.status_code == 200
+    assert response.json()["enabled"] is True
+    events = client.get("/audit?limit=20").json()
+    assert any(e["event_type"] == "source.updated" and e["entity_id"] == auto_source_id
+               for e in events)
+
+
+def test_disabled_source_cannot_run(client, auto_source_id):
+    client.patch(f"/sources/{auto_source_id}", json={"enabled": False})
+    try:
+        response = client.post("/inventory/run", json={"source_id": auto_source_id})
+        assert response.status_code == 409
+    finally:
+        client.patch(f"/sources/{auto_source_id}", json={"enabled": True})
+
+
+def test_run_detail_and_stats(client, auto_source_id):
+    run = client.post("/inventory/run", json={"source_id": auto_source_id}).json()
+    detail = client.get(f"/inventory/runs/{run['run_id']}").json()
+    assert detail["source_id"] == auto_source_id
+    assert len(detail["files"]) == detail["files_scanned"] == run["files_scanned"]
+    assert client.get(f"/inventory/runs/{uuid4()}").status_code == 404
+
+    stats = client.get("/stats").json()
+    assert stats["sources_total"] >= 2
+    assert stats["recent_runs"][0]["run_id"] == run["run_id"]
+
+    events = client.get("/audit?limit=10").json()
+    assert any(e["event_type"] == "inventory.completed" and e["entity_id"] == run["run_id"]
+               for e in events)
+
+
+def test_audit_limit_out_of_range(client):
+    assert client.get("/audit?limit=0").status_code == 400
