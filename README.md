@@ -50,18 +50,18 @@ python -m venv apps\api\.venv
 Set-Location apps\web; npm install; npm run build; Set-Location ..\..
 
 # Lancement
-& ".\apps\api\.venv\Scripts\python.exe" -m uvicorn main:app --app-dir apps\api --host 127.0.0.1 --port 8010
+& ".\apps\api\.venv\Scripts\python.exe" -m uvicorn main:app --app-dir apps\api --host 127.0.0.1 --port 8020
 ```
 
-- Interface : http://127.0.0.1:8010/
-- Documentation API : http://127.0.0.1:8010/docs
+- Interface : http://127.0.0.1:8020/
+- Documentation API : http://127.0.0.1:8020/docs
 
-Le port 8000 est occupé par un autre projet sur ce poste, d'où le port 8010.
+Les ports 8000 et 8010 sont utilisés par d'autres projets sur ce poste, d'où le port 8020.
 Les sauvegardes sont stockées dans `E:\RECUPBA\backups` (variable `RECUPBA_BACKUP_DIR`
 pour choisir un autre disque, idéalement différent de celui des sources).
 Les migrations SQL (`apps/api/migrations`) sont idempotentes et appliquées au démarrage.
 
-Développement de l'interface avec rechargement à chaud (API lancée sur 8010) :
+Développement de l'interface avec rechargement à chaud (API lancée sur 8020) :
 
 ```powershell
 Set-Location "E:\RECUPBA\apps\web"; npm run dev   # http://127.0.0.1:5173

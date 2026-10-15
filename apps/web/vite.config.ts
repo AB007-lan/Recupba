@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const api = "http://127.0.0.1:8010";
+const api = "http://127.0.0.1:8020";
 const proxied = ["/api", "/health", "/sources", "/inventory", "/backups", "/stats", "/audit", "/docs", "/openapi.json"];
 
 export default defineConfig({
