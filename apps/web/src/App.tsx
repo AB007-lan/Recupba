@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 import { Link, usePath } from "./ui";
 import { AuditPage } from "./pages/Audit";
+import { BackupDetailPage } from "./pages/BackupDetail";
 import { Dashboard } from "./pages/Dashboard";
 import { RunDetail } from "./pages/RunDetail";
 import { SourceDetail } from "./pages/SourceDetail";
@@ -9,7 +10,7 @@ import { SourcesPage } from "./pages/Sources";
 
 const NAV = [
   { to: "/app", label: "Tableau de bord", match: (p: string) => p === "/" || p === "/app" || p.startsWith("/app/runs") },
-  { to: "/app/sources", label: "Sources", match: (p: string) => p.startsWith("/app/sources") },
+  { to: "/app/sources", label: "Sources", match: (p: string) => p.startsWith("/app/sources") || p.startsWith("/app/backups") },
   { to: "/app/audit", label: "Journal d'audit", match: (p: string) => p.startsWith("/app/audit") },
 ];
 
@@ -18,6 +19,8 @@ function route(path: string) {
   if (source) return <SourceDetail id={source[1]} />;
   const run = path.match(/^\/app\/runs\/([0-9a-f-]{36})$/i);
   if (run) return <RunDetail id={run[1]} />;
+  const backup = path.match(/^\/app\/backups\/([0-9a-f-]{36})$/i);
+  if (backup) return <BackupDetailPage id={backup[1]} />;
   if (path === "/app/sources") return <SourcesPage />;
   if (path === "/app/audit") return <AuditPage />;
   return <Dashboard />;

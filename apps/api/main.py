@@ -21,7 +21,7 @@ from db import (
     mark_interrupted_runs,
 )
 
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.4.0"
 WEB_DIST = BASE_DIR / "apps" / "web" / "dist"
 
 logging.basicConfig(level=logging.INFO)
@@ -32,9 +32,10 @@ logger = logging.getLogger("recupba")
 async def lifespan(_app: FastAPI):
     try:
         apply_migrations()
+        purge_tmp()
         interrupted = mark_interrupted_runs()
         if interrupted:
-            logger.warning("%s inventaire(s) interrompu(s) clôturé(s).", interrupted)
+            logger.warning("%s opération(s) interrompue(s) clôturée(s).", interrupted)
     except Exception:
         logger.exception("Initialisation de la base impossible au démarrage.")
     yield
@@ -269,7 +270,10 @@ def dashboard_stats():
                         (SELECT COUNT(*) FROM sources WHERE enabled),
                         (SELECT COUNT(*) FROM inventory_runs),
                         (SELECT COUNT(*) FROM inventory_runs
-                          WHERE status NOT IN ('completed', 'running')),
+                          WHERE status NOT IN ('completed', 'running'))
+                        + (SELECT COUNT(*) FROM backups
+                           WHERE status NOT IN ('completed', 'running')
+                              OR verification_status = 'corrupted'),
                         (SELECT MAX(started_at) FROM inventory_runs)
                     """
                 )
@@ -338,9 +342,11 @@ def list_audit_events(limit: int = 50):
     ]
 
 
+from backup import purge_tmp, router as backup_router  # noqa: E402
 from inventory import router as inventory_router  # noqa: E402
 
 app.include_router(inventory_router)
+app.include_router(backup_router)
 
 
 # Interface web (build Vite) servie par l'API lorsqu'elle est construite.

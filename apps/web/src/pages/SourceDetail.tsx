@@ -2,15 +2,16 @@ import { useState } from "react";
 import { ApiError, api, type Comparison } from "../api";
 import {
   Alert, Empty, Link, Loading, PageHeader, StatusBadge,
-  formatDate, formatDuration, formatRelative, shortId, useLoad,
+  formatBytes, formatDate, formatDuration, formatRelative, navigate, shortId, useLoad,
 } from "../ui";
 import { SourceForm } from "./Sources";
 
-type Tab = "history" | "compare";
+type Tab = "history" | "compare" | "backups";
 
 export function SourceDetail({ id }: { id: string }) {
   const source = useLoad(() => api.source(id), [id]);
   const history = useLoad(() => api.history(id), [id]);
+  const backups = useLoad(() => api.backups(id), [id]);
   const [tab, setTab] = useState<Tab>("history");
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -31,6 +32,26 @@ export function SourceDetail({ id }: { id: string }) {
     } catch (err) {
       setMessage({ kind: "error", text: err instanceof Error ? err.message : String(err) });
       history.reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBackup() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await api.runBackup(id);
+      setMessage({
+        kind: result.errors_count ? "error" : "success",
+        text: `Sauvegarde terminée : ${result.files_count} fichier(s), ${formatBytes(result.bytes_total)} protégés, `
+          + `${formatBytes(result.bytes_new)} nouveaux stockés, ${result.errors_count} erreur(s).`,
+      });
+      backups.reload();
+      setTab("backups");
+    } catch (err) {
+      setMessage({ kind: "error", text: err instanceof Error ? err.message : String(err) });
+      backups.reload();
     } finally {
       setBusy(false);
     }
@@ -74,9 +95,13 @@ export function SourceDetail({ id }: { id: string }) {
             <button className="btn" onClick={toggleEnabled} disabled={busy}>
               {s.enabled ? "Désactiver" : "Activer"}
             </button>
-            <button className="btn btn-primary" onClick={runInventory} disabled={busy || !s.enabled}
+            <button className="btn" onClick={runInventory} disabled={busy || !s.enabled}
               title={s.enabled ? undefined : "Activez la source pour lancer un inventaire"}>
-              {busy ? "Inventaire en cours…" : "Lancer un inventaire"}
+              Lancer un inventaire
+            </button>
+            <button className="btn btn-primary" onClick={runBackup} disabled={busy || !s.enabled}
+              title={s.enabled ? "Copie le contenu des fichiers dans le magasin de sauvegarde" : "Activez la source pour sauvegarder"}>
+              {busy ? "Traitement en cours…" : "Sauvegarder maintenant"}
             </button>
           </>
         }
@@ -99,6 +124,9 @@ export function SourceDetail({ id }: { id: string }) {
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === "history"} className={tab === "history" ? "active" : ""} onClick={() => setTab("history")}>
           Historique {history.data ? `(${history.data.count})` : ""}
+        </button>
+        <button role="tab" aria-selected={tab === "backups"} className={tab === "backups" ? "active" : ""} onClick={() => setTab("backups")}>
+          Sauvegardes {backups.data ? `(${backups.data.length})` : ""}
         </button>
         <button role="tab" aria-selected={tab === "compare"} className={tab === "compare" ? "active" : ""} onClick={() => setTab("compare")}>
           Dernières modifications
@@ -147,6 +175,55 @@ export function SourceDetail({ id }: { id: string }) {
       )}
 
       {tab === "compare" && <ComparePanel key={compareKey} sourceId={id} />}
+
+      {tab === "backups" && (
+        <section className="card">
+          {backups.error && <Alert>{backups.error}</Alert>}
+          {backups.loading && !backups.data && <Loading />}
+          {backups.data && backups.data.length === 0 && (
+            <Empty title="Aucune sauvegarde">
+              Cliquez sur « Sauvegarder maintenant » pour copier le contenu des fichiers en lieu sûr.
+            </Empty>
+          )}
+          {backups.data && backups.data.length > 0 && (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sauvegarde</th>
+                    <th>Statut</th>
+                    <th>Intégrité</th>
+                    <th className="num">Fichiers</th>
+                    <th className="num">Volume</th>
+                    <th className="num">Nouveau</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {backups.data.map((b) => (
+                    <tr key={b.backup_id} className="clickable" onClick={() => navigate(`/app/backups/${b.backup_id}`)}>
+                      <td><Link to={`/app/backups/${b.backup_id}`} className="mono">{shortId(b.backup_id)}</Link></td>
+                      <td>
+                        <StatusBadge status={b.status} />
+                        {b.error_message && <div className="error-text">{b.error_message}</div>}
+                      </td>
+                      <td>
+                        {b.verification_status === "ok" && <span className="badge badge-completed">Vérifiée</span>}
+                        {b.verification_status === "corrupted" && <span className="badge badge-failed">Corrompue</span>}
+                        {!b.verification_status && <span className="muted">—</span>}
+                      </td>
+                      <td className="num">{b.files_count}</td>
+                      <td className="num">{formatBytes(b.bytes_total)}</td>
+                      <td className="num">{formatBytes(b.bytes_new)}</td>
+                      <td title={formatDate(b.started_at)}>{formatRelative(b.started_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
     </>
   );
 }

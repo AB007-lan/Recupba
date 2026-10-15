@@ -15,13 +15,19 @@ Logiciel hybride de collecte et de synchronisation de données multi-sources.
 - Inventaire de dossiers : chemins relatifs, tailles, dates de modification, empreintes SHA-256.
 - Comparaison des deux derniers inventaires : fichiers nouveaux, modifiés, supprimés et inchangés.
 - Historique des inventaires et détail des fichiers de chaque exécution.
-- Journal d'audit des opérations (sources, inventaires terminés, échoués ou interrompus).
+- Sauvegarde du contenu des fichiers dans un magasin compressé (gzip) et dédupliqué par SHA-256 :
+  un contenu identique n'est stocké qu'une fois, quel que soit le nombre de sauvegardes.
+- Vérification d'intégrité d'une sauvegarde (relecture et recalcul de chaque empreinte).
+- Restauration complète ou sélective vers un dossier au choix, avec les dates d'origine.
+  Par sécurité : restauration dans la source interdite, fichiers existants jamais écrasés sans accord explicite.
+- Téléchargement d'un fichier tel qu'il était au moment d'une sauvegarde.
+- Journal d'audit des opérations (sources, inventaires, sauvegardes, vérifications, restaurations).
 - Clôture automatique, au démarrage, des inventaires interrompus par un arrêt du serveur.
-- Interface web : tableau de bord, sources, comparaison, détail d'exécution, audit.
+- Interface web : tableau de bord, sources, comparaison, inventaires, sauvegardes, restauration, audit.
 
 ## Feuille de route (non réalisé)
 
-1. Sauvegarde et restauration fiables.
+1. Sauvegardes planifiées, rétention (suppression des anciennes versions), chiffrement.
 2. Connecteurs PostgreSQL, MySQL et Odoo.
 3. Synchronisation, reprise sur incident.
 4. Authentification et gestion des secrets.
@@ -51,6 +57,8 @@ Set-Location apps\web; npm install; npm run build; Set-Location ..\..
 - Documentation API : http://127.0.0.1:8010/docs
 
 Le port 8000 est occupé par un autre projet sur ce poste, d'où le port 8010.
+Les sauvegardes sont stockées dans `E:\RECUPBA\backups` (variable `RECUPBA_BACKUP_DIR`
+pour choisir un autre disque, idéalement différent de celui des sources).
 Les migrations SQL (`apps/api/migrations`) sont idempotentes et appliquées au démarrage.
 
 Développement de l'interface avec rechargement à chaud (API lancée sur 8010) :

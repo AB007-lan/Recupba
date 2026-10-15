@@ -7,11 +7,20 @@ const EVENT_LABELS: Record<string, string> = {
   "inventory.completed": "Inventaire terminé",
   "inventory.failed": "Inventaire en échec",
   "inventory.interrupted": "Inventaire interrompu",
+  "backup.completed": "Sauvegarde terminée",
+  "backup.failed": "Sauvegarde en échec",
+  "backup.interrupted": "Sauvegarde interrompue",
+  "backup.verified_ok": "Sauvegarde vérifiée",
+  "backup.verified_corrupted": "Sauvegarde corrompue",
+  "restore.completed": "Restauration terminée",
+  "restore.failed": "Restauration en échec",
+  "restore.interrupted": "Restauration interrompue",
 };
 
 function entityLink(type: string | null, id: string | null) {
   if (!id) return "—";
   if (type === "source") return <Link to={`/app/sources/${id}`} className="mono">{shortId(id)}</Link>;
+  if (type === "backup") return <Link to={`/app/backups/${id}`} className="mono">{shortId(id)}</Link>;
   if (type === "inventory_run") return <Link to={`/app/runs/${id}`} className="mono">{shortId(id)}</Link>;
   return <span className="mono">{shortId(id)}</span>;
 }
@@ -42,7 +51,7 @@ export function AuditPage() {
                   {data.map((event) => (
                     <tr key={event.id}>
                       <td className="nowrap">{formatDate(event.created_at)}</td>
-                      <td><span className={`event event-${event.event_type.split(".")[1]}`}>{EVENT_LABELS[event.event_type] ?? event.event_type}</span></td>
+                      <td><span className={`event event-${event.event_type.split(".")[1].replace("verified_ok", "completed").replace("verified_corrupted", "failed")}`}>{EVENT_LABELS[event.event_type] ?? event.event_type}</span></td>
                       <td>{entityLink(event.entity_type, event.entity_id)}</td>
                       <td className="details">
                         {Object.entries(event.details).map(([key, value]) => (

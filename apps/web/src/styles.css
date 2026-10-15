@@ -206,3 +206,13 @@ tbody tr:hover { background: var(--surface-2); }
 .empty { text-align: center; padding: 32px 16px; color: var(--muted); }
 .empty strong { color: var(--text); }
 .empty p { margin: 6px 0 0; }
+
+/* Sauvegardes */
+.check-col { width: 36px; }
+.check-col input { width: 16px; height: 16px; cursor: pointer; }
+tr.selected { background: var(--primary-soft); }
+tr.clickable { cursor: pointer; }
+.restore-form { max-width: none; }
+.restore-form p { margin: 0; }
+.content { min-width: 0; }
+.alert span, td code { overflow-wrap: anywhere; }

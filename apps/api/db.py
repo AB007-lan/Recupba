@@ -71,4 +71,19 @@ def mark_interrupted_runs() -> int:
             for run_id, source_id in rows:
                 log_event(cursor, "inventory.interrupted", "inventory_run", run_id,
                           {"source_id": str(source_id)})
+            for table, entity in (("backups", "backup"), ("restores", "restore")):
+                cursor.execute(
+                    f"""
+                    UPDATE {table}
+                    SET status = 'interrupted',
+                        finished_at = clock_timestamp(),
+                        error_message = 'Opération interrompue (arrêt du serveur).'
+                    WHERE status = 'running'
+                    RETURNING id
+                    """
+                )
+                interrupted = cursor.fetchall()
+                for (row_id,) in interrupted:
+                    log_event(cursor, f"{entity}.interrupted", entity, row_id)
+                rows += interrupted
     return len(rows)

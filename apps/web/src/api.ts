@@ -56,6 +56,46 @@ export type AuditEvent = {
   created_at: string;
 };
 
+export type Backup = {
+  backup_id: string;
+  source_id: string;
+  source_name: string;
+  status: string;
+  files_count: number;
+  bytes_total: number;
+  bytes_new: number;
+  objects_new: number;
+  errors_count: number;
+  started_at: string | null;
+  finished_at: string | null;
+  verified_at: string | null;
+  verification_status: "ok" | "corrupted" | null;
+  error_message: string | null;
+};
+
+export type Restore = {
+  restore_id: string;
+  target_path: string;
+  status: string;
+  files_restored: number;
+  errors_count: number;
+  started_at: string | null;
+  finished_at: string | null;
+  error_message: string | null;
+};
+
+export type BackupDetail = Backup & {
+  files: { path: string; size_bytes: number; modified_at: string; sha256: string }[];
+  restores: Restore[];
+};
+
+export type BackupStats = {
+  backups_completed: number;
+  bytes_protected: number;
+  bytes_stored: number;
+  store_path: string;
+};
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -100,5 +140,18 @@ export const api = {
     request<{ count: number; runs: RunSummary[] }>(`/inventory/history/${sourceId}?limit=${limit}`),
   compare: (sourceId: string) => request<Comparison>(`/inventory/compare/${sourceId}`),
   run: (runId: string) => request<RunDetail>(`/inventory/runs/${runId}`),
+  runBackup: (sourceId: string) =>
+    request<Backup>("/backups/run", { method: "POST", body: JSON.stringify({ source_id: sourceId }) }),
+  backups: (sourceId?: string, limit = 50) =>
+    request<Backup[]>(`/backups?limit=${limit}${sourceId ? `&source_id=${sourceId}` : ""}`),
+  backup: (id: string) => request<BackupDetail>(`/backups/${id}`),
+  backupStats: () => request<BackupStats>("/backups/stats"),
+  verifyBackup: (id: string) =>
+    request<{ verification_status: string; files_checked: number; invalid_files: string[] }>(
+      `/backups/${id}/verify`, { method: "POST" }),
+  restoreBackup: (id: string, data: { target_path: string; paths?: string[]; overwrite: boolean }) =>
+    request<{ status: string; target_path: string; files_restored: number; files_skipped: string[]; errors_count: number }>(
+      `/backups/${id}/restore`, { method: "POST", body: JSON.stringify(data) }),
+  downloadUrl: (id: string, path: string) => `/backups/${id}/download?path=${encodeURIComponent(path)}`,
   audit: (limit = 100) => request<AuditEvent[]>(`/audit?limit=${limit}`),
 };

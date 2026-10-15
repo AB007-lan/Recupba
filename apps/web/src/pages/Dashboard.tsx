@@ -1,15 +1,16 @@
 import { api } from "../api";
-import { Alert, Empty, Link, Loading, PageHeader, Stat, StatusBadge, formatDate, formatRelative, useLoad } from "../ui";
+import { Alert, Empty, Link, Loading, PageHeader, Stat, StatusBadge, formatBytes, formatDate, formatRelative, useLoad } from "../ui";
 
 export function Dashboard() {
   const { data, error, loading, reload } = useLoad(() => api.stats());
+  const store = useLoad(() => api.backupStats());
 
   return (
     <>
       <PageHeader
         title="Tableau de bord"
         subtitle="Vue d'ensemble des sources et des inventaires de fichiers."
-        actions={<button className="btn" onClick={reload} disabled={loading}>Actualiser</button>}
+        actions={<button className="btn" onClick={() => { reload(); store.reload(); }} disabled={loading}>Actualiser</button>}
       />
 
       {error && <Alert>{error}</Alert>}
@@ -21,9 +22,14 @@ export function Dashboard() {
             <Stat label="Sources" value={data.sources_total} hint={`${data.sources_enabled} activée(s)`} />
             <Stat label="Inventaires" value={data.runs_total} hint={`Dernier : ${formatRelative(data.last_run_at)}`} />
             <Stat
+              label="Données protégées"
+              value={store.data ? formatBytes(store.data.bytes_protected) : "—"}
+              hint={store.data ? `${store.data.backups_completed} sauvegarde(s), ${formatBytes(store.data.bytes_stored)} sur disque` : undefined}
+            />
+            <Stat
               label="À surveiller"
               value={data.runs_with_problems}
-              hint="Échecs, interruptions ou erreurs"
+              hint="Inventaires ou sauvegardes en échec"
               tone={data.runs_with_problems > 0 ? "warn" : undefined}
             />
           </section>

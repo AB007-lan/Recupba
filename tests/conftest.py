@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -20,11 +21,18 @@ def client():
     return TestClient(main.app)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def isolated_backup_store(tmp_path_factory):
+    """Les tests n'écrivent jamais dans le vrai magasin de sauvegardes."""
+    os.environ["RECUPBA_BACKUP_DIR"] = str(tmp_path_factory.mktemp("backup-store"))
+
+
 @pytest.fixture(scope="session")
 def database_available():
     try:
         with main.database_connection() as connection:
             connection.execute("SELECT 1")
+        main.apply_migrations()
     except Exception:
         pytest.skip("Base PostgreSQL RECUPBA indisponible.")
 
